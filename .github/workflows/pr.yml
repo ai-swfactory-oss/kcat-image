@@ -16,7 +16,6 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
-      publish: false
 
   merge:
     needs: test

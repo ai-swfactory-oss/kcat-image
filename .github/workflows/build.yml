@@ -1,8 +1,8 @@
 name: build
 
 # Builds the image natively on amd64 and arm64, smoke-tests it against a real
-# Kafka-compatible broker and, when `publish` is true, pushes a multi-arch image
-# to ghcr.io/ai-swfactory/kcat.
+# Kafka-compatible broker and pushes a multi-arch image to ghcr.io/ai-swfactory/kcat.
+# Pull requests (this workflow called from pr.yml) build and test only.
 
 on:
   push:
@@ -15,10 +15,6 @@ on:
         description: Git ref to build
         type: string
         required: true
-      publish:
-        description: Push the image to GHCR
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -30,7 +26,7 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/kcat
-  PUBLISH: ${{ inputs.publish == false && 'false' || 'true' }}
+  PUBLISH: ${{ github.event_name != 'pull_request' }}
 
 jobs:
   image:
@@ -90,7 +86,7 @@ jobs:
 
   manifest:
     needs: image
-    if: inputs.publish != false
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - name: Publish multi-arch tags

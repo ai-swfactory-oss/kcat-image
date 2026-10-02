@@ -1,0 +1,28 @@
+name: pr
+
+# Every PR builds and smoke-tests the image (nothing is published). Dependabot
+# PRs (GitHub Actions versions) are then merged automatically.
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+      publish: false
+
+  merge:
+    needs: test
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: gh pr merge "${{ github.event.pull_request.html_url }}" --squash --delete-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

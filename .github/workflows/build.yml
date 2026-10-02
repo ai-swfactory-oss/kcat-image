@@ -1,0 +1,105 @@
+name: build
+
+# Builds the image natively on amd64 and arm64, smoke-tests it against a real
+# Kafka-compatible broker and, when `publish` is true, pushes a multi-arch image
+# to ghcr.io/ai-swfactory/kcat.
+
+on:
+  push:
+    branches: [main]
+    paths: [flake.nix, flake.lock, .github/workflows/build.yml]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build
+        type: string
+        required: true
+      publish:
+        description: Push the image to GHCR
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-${{ github.ref }}-${{ inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/kcat
+  PUBLISH: ${{ inputs.publish == false && 'false' || 'true' }}
+
+jobs:
+  image:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+            system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            system: aarch64-linux
+    runs-on: ${{ matrix.runner }}
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Build
+        run: nix build .#packages.${{ matrix.system }}.image --print-build-logs
+
+      - name: Metadata
+        id: meta
+        run: echo "version=$(nix eval --raw .#packages.${{ matrix.system }}.kcat.version)" >> "$GITHUB_OUTPUT"
+
+      - name: Load
+        run: |
+          loaded=$(docker load < result | sed -n 's/^Loaded image: //p')
+          docker tag "$loaded" kcat:test
+          docker image ls kcat:test
+
+      - name: Smoke test against a Kafka-compatible broker
+        run: |
+          docker run -d --name broker -p 9092:9092 docker.redpanda.com/redpandadata/redpanda:latest \
+            redpanda start --mode dev-container --smp 1 \
+            --kafka-addr 0.0.0.0:9092 --advertise-kafka-addr 127.0.0.1:9092
+          for i in $(seq 1 60); do
+            docker run --rm --network host kcat:test -b 127.0.0.1:9092 -L -m 2 >/dev/null 2>&1 && break
+            sleep 2
+          done
+          echo "smoke-$GITHUB_RUN_ID" | docker run --rm -i --network host kcat:test -b 127.0.0.1:9092 -t smoke -P
+          got=$(docker run --rm --network host kcat:test -b 127.0.0.1:9092 -t smoke -C -o beginning -c 1 -e -q)
+          test "$got" = "smoke-$GITHUB_RUN_ID"
+          docker run --rm kcat:test -V
+
+      - name: Push arch image
+        if: env.PUBLISH == 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag kcat:test "$IMAGE:build-${{ github.run_id }}-${{ matrix.arch }}"
+          docker push "$IMAGE:build-${{ github.run_id }}-${{ matrix.arch }}"
+
+  manifest:
+    needs: image
+    if: inputs.publish != false
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Publish multi-arch tags
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          v="${{ needs.image.outputs.version }}"
+          d=$(date -u +%Y%m%d)
+          src="$IMAGE:build-${{ github.run_id }}"
+          docker buildx imagetools create \
+            -t "$IMAGE:latest" -t "$IMAGE:$v" -t "$IMAGE:$v-$d" \
+            "$src-amd64" "$src-arm64"
+          docker buildx imagetools inspect "$IMAGE:$v-$d"

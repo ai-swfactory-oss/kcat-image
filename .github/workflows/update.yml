@@ -1,9 +1,11 @@
 name: update
 
-# Daily: move nixpkgs to the latest nixos-unstable channel. The lock is always
-# committed (this also keeps the repo active, so GitHub never disables the
-# schedule). A new image is built and published only when the image itself
-# changed, i.e. when its Nix store path differs from the previous lock's.
+# Daily: move nixpkgs to the latest nixos-unstable channel and commit flake.lock
+# (the commit also keeps the repository active, so GitHub never disables the
+# schedule). Then make sure the image for the current lock is published: every
+# image is tagged nix-<key>, where <key> is derived from the image's Nix store
+# paths, so a missing tag means "not built yet". A failed build is therefore
+# retried every day until it succeeds.
 
 on:
   schedule:
@@ -18,52 +20,48 @@ concurrency:
   group: update
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/kcat
+
 jobs:
   update:
     runs-on: ubuntu-24.04
     outputs:
-      changed: ${{ steps.diff.outputs.changed }}
+      missing: ${{ steps.check.outputs.missing }}
       sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
 
       - uses: cachix/install-nix-action@v31
 
-      - name: Image store paths before
-        run: |
-          for s in x86_64-linux aarch64-linux; do
-            nix eval --raw .#packages.$s.image.outPath; echo
-          done > /tmp/before
-
       - name: Update nixpkgs
         run: nix flake update
-
-      - name: Image store paths after
-        id: diff
-        run: |
-          for s in x86_64-linux aarch64-linux; do
-            nix eval --raw .#packages.$s.image.outPath; echo
-          done > /tmp/after
-          diff /tmp/before /tmp/after && changed=false || changed=true
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Commit lock
         id: commit
         run: |
-          if git diff --quiet flake.lock; then
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"; exit 0
+          if ! git diff --quiet flake.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: update nixpkgs"
+            git push
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          msg="chore: update nixpkgs"
-          [ "${{ steps.diff.outputs.changed }}" = true ] && msg="$msg (image changed)"
-          git commit -am "$msg"
-          git push
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Is the image for this lock published?
+        id: check
+        run: |
+          key=$(nix eval --raw .#imageKey)
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if docker buildx imagetools inspect "$IMAGE:nix-$key" >/dev/null 2>&1; then
+            echo "missing=false" >> "$GITHUB_OUTPUT"; echo "nix-$key already published"
+          else
+            echo "missing=true" >> "$GITHUB_OUTPUT"; echo "nix-$key not published: building"
+          fi
 
   build:
     needs: update
-    if: needs.update.outputs.changed == 'true'
+    if: needs.update.outputs.missing == 'true'
     uses: ./.github/workflows/build.yml
     with:
       ref: ${{ needs.update.outputs.sha }}

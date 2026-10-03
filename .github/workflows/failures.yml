@@ -1,0 +1,39 @@
+name: failures
+
+# Keeps one issue (label build-failure) in sync with the health of main:
+# a failed update/build run opens it, or comments on it if it is already open;
+# the next successful run closes it.
+
+on:
+  workflow_run:
+    workflows: [update, build]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  issues: write
+
+jobs:
+  report:
+    if: github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RESULT: ${{ github.event.workflow_run.conclusion }}
+      RUN: ${{ github.event.workflow_run.html_url }}
+      NAME: ${{ github.event.workflow_run.name }}
+    steps:
+      - run: |
+          gh label create build-failure --color B60205 --description "Automated: main fails to build or publish" 2>/dev/null || true
+          open=$(gh issue list --label build-failure --state open --json number --jq '.[0].number')
+          if [ "$RESULT" = failure ]; then
+            if [ -n "$open" ]; then
+              gh issue comment "$open" --body "Still failing: [$NAME run]($RUN)"
+            else
+              gh issue create --label build-failure --title "Image build failing on main" \
+                --body "The [$NAME run]($RUN) failed. Nothing was published; the previous image is still served. This issue closes on the next successful run."
+            fi
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "Fixed: [$NAME run]($RUN) succeeded."
+          fi

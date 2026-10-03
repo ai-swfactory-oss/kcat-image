@@ -43,6 +43,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     outputs:
       version: ${{ steps.meta.outputs.version }}
+      key: ${{ steps.meta.outputs.key }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -55,7 +56,9 @@ jobs:
 
       - name: Metadata
         id: meta
-        run: echo "version=$(nix eval --raw .#packages.${{ matrix.system }}.kcat.version)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(nix eval --raw .#packages.${{ matrix.system }}.kcat.version)" >> "$GITHUB_OUTPUT"
+          echo "key=$(nix eval --raw .#imageKey)" >> "$GITHUB_OUTPUT"
 
       - name: Load
         run: |
@@ -97,5 +100,6 @@ jobs:
           src="$IMAGE:build-${{ github.run_id }}"
           docker buildx imagetools create \
             -t "$IMAGE:latest" -t "$IMAGE:$v" -t "$IMAGE:$v-$d" \
+            -t "$IMAGE:nix-${{ needs.image.outputs.key }}" \
             "$src-amd64" "$src-arm64"
           docker buildx imagetools inspect "$IMAGE:$v-$d"

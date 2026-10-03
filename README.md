@@ -5,7 +5,8 @@ Minimal, self-updating container image with [kcat](https://github.com/edenhill/k
 ```
 ghcr.io/ai-swfactory/kcat:latest
 ghcr.io/ai-swfactory/kcat:1.7.1            # kcat version, moves with rebuilds
-ghcr.io/ai-swfactory/kcat:1.7.1-YYYYMMDD   # immutable per published build
+ghcr.io/ai-swfactory/kcat:1.7.1-YYYYMMDD   # per published build
+ghcr.io/ai-swfactory/kcat:nix-<key>        # content-addressed: one tag per exact image
 ```
 
 Platforms: `linux/amd64`, `linux/arm64`.
@@ -51,13 +52,16 @@ volumes:
 
 | Workflow | When | What |
 |---|---|---|
-| `update` | Daily 04:17 UTC | Moves `nixpkgs` to the latest `nixos-unstable` channel and commits `flake.lock`. If the image's Nix store path changed, builds, tests and publishes a new image. Otherwise publishes nothing. |
-| `build` | Push to `main` touching the flake or the workflow, manual | Builds natively on amd64 and arm64, smoke-tests against a real broker (Redpanda), publishes the multi-arch image. |
-| `pr` | Every pull request | Builds and smoke-tests without publishing. Dependabot PRs (GitHub Actions versions, weekly) are merged automatically when green. |
+| `update` | Daily 04:17 UTC | Moves `nixpkgs` to the latest `nixos-unstable` channel and commits `flake.lock`. Then checks whether the image for that lock is already published (tag `nix-<key>`, derived from the image's Nix store paths). If not, builds, tests and publishes it. A failed build is retried the next day. |
+| `build` | Push to `main` touching the flake or the workflow, manual, called by `update` | Builds natively on amd64 and arm64, smoke-tests against a real broker (Redpanda), publishes the multi-arch image. |
+| `pr` | Every pull request | Builds and smoke-tests without publishing. |
+| `failures` | After every `update` or `build` run on `main` | A failure opens one issue labelled `build-failure` (or comments on the open one); the next successful run closes it. |
 
-The daily lock commit also keeps the repository active, so GitHub never disables the schedule. A failing run publishes nothing (the previous image stays) and GitHub emails the failure.
+The daily lock commit also keeps the repository active, so GitHub never disables the schedule. A failing run publishes nothing: the previous image keeps being served.
 
-The build is reproducible: same `flake.lock`, same image digest.
+GitHub Actions are referenced by major tag (`@v7`, `@v31`), so minor and patch releases apply automatically. A new major is only needed when GitHub retires an old Node runtime; if that ever breaks the build, the `failures` issue says so.
+
+The build is reproducible: same `flake.lock`, same image.
 
 ## Local build
 

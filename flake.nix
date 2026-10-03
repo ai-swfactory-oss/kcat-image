@@ -65,5 +65,11 @@
 
           default = image;
         });
+
+      # Identifies the published image by content: a hash of both architectures'
+      # image store paths. The registry tag nix-<imageKey> means "this exact image
+      # is published"; the daily update builds whenever that tag is missing.
+      imageKey = builtins.substring 0 16 (builtins.hashString "sha256"
+        (builtins.concatStringsSep "," (map (s: self.packages.${s}.image.outPath) systems)));
     };
 }

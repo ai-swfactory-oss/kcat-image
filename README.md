@@ -1,5 +1,8 @@
 # kcat-image
 
+[![update](https://github.com/ai-swfactory/kcat-image/actions/workflows/update.yml/badge.svg)](https://github.com/ai-swfactory/kcat-image/actions/workflows/update.yml)
+[![build](https://github.com/ai-swfactory/kcat-image/actions/workflows/build.yml/badge.svg)](https://github.com/ai-swfactory/kcat-image/actions/workflows/build.yml)
+
 Minimal, self-updating container image with [kcat](https://github.com/edenhill/kcat), the Kafka producer/consumer CLI.
 
 ```

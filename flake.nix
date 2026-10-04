@@ -8,10 +8,23 @@
 
   outputs = { self, nixpkgs }:
     let
+      # The image is Linux-only; the dev shell also covers Apple Silicon macOS
+      # (nixpkgs unstable no longer supports x86_64-darwin).
       systems = [ "x86_64-linux" "aarch64-linux" ];
+      devSystems = systems ++ [ "aarch64-darwin" ];
       forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
+      # Toolchain for working on this repo. claude-factory re-enters this shell
+      # (`nix develop --command node ...`) whenever it runs inside the flake, so it
+      # must provide node.
+      devShells = nixpkgs.lib.genAttrs devSystems (system:
+        let pkgs = nixpkgs.legacyPackages.${system}; in {
+          default = pkgs.mkShell {
+            packages = [ pkgs.nodejs_24 pkgs.git pkgs.gh pkgs.jq pkgs.actionlint ];
+          };
+        });
+
       packages = forAll (pkgs:
         let
           static = pkgs.pkgsStatic;

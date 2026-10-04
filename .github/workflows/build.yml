@@ -54,6 +54,11 @@ jobs:
       - name: Build
         run: nix build .#packages.${{ matrix.system }}.image --print-build-logs
 
+      - name: Dev shell (used by claude-factory) builds here and evaluates on macOS
+        run: |
+          nix build .#devShells.${{ matrix.system }}.default --no-link
+          nix eval --raw .#devShells.aarch64-darwin.default.drvPath >/dev/null
+
       - name: Metadata
         id: meta
         run: |

@@ -1,15 +1,15 @@
 # kcat-image
 
-[![update](https://github.com/ai-swfactory/kcat-image/actions/workflows/update.yml/badge.svg)](https://github.com/ai-swfactory/kcat-image/actions/workflows/update.yml)
-[![build](https://github.com/ai-swfactory/kcat-image/actions/workflows/build.yml/badge.svg)](https://github.com/ai-swfactory/kcat-image/actions/workflows/build.yml)
+[![update](https://github.com/ai-swfactory-oss/kcat-image/actions/workflows/update.yml/badge.svg)](https://github.com/ai-swfactory-oss/kcat-image/actions/workflows/update.yml)
+[![build](https://github.com/ai-swfactory-oss/kcat-image/actions/workflows/build.yml/badge.svg)](https://github.com/ai-swfactory-oss/kcat-image/actions/workflows/build.yml)
 
 Minimal, self-updating container image with [kcat](https://github.com/edenhill/kcat), the Kafka producer/consumer CLI.
 
 ```
-ghcr.io/ai-swfactory/kcat:latest
-ghcr.io/ai-swfactory/kcat:1.7.1            # kcat version, moves with rebuilds
-ghcr.io/ai-swfactory/kcat:1.7.1-YYYYMMDD   # per published build
-ghcr.io/ai-swfactory/kcat:nix-<key>        # content-addressed: one tag per exact image
+ghcr.io/ai-swfactory-oss/kcat:latest
+ghcr.io/ai-swfactory-oss/kcat:1.7.1            # kcat version, moves with rebuilds
+ghcr.io/ai-swfactory-oss/kcat:1.7.1-YYYYMMDD   # per published build
+ghcr.io/ai-swfactory-oss/kcat:nix-<key>        # content-addressed: one tag per exact image
 ```
 
 Platforms: `linux/amd64`, `linux/arm64`.
@@ -29,10 +29,10 @@ Built without Avro/Schema Registry and without SASL/OIDC: plaintext and TLS brok
 
 ```sh
 # produce one message
-echo "hello" | docker run --rm -i ghcr.io/ai-swfactory/kcat -b kafka:9092 -t my-topic -P
+echo "hello" | docker run --rm -i ghcr.io/ai-swfactory-oss/kcat -b kafka:9092 -t my-topic -P
 
 # consume one message and exit
-docker run --rm ghcr.io/ai-swfactory/kcat -b kafka:9092 -t my-topic -C -c 1 -e
+docker run --rm ghcr.io/ai-swfactory-oss/kcat -b kafka:9092 -t my-topic -C -c 1 -e
 ```
 
 Kubernetes CronJob publishing a tick (the image has no shell, so the message comes from a mounted file; kcat sends each file as one message):
@@ -40,7 +40,7 @@ Kubernetes CronJob publishing a tick (the image has no shell, so the message com
 ```yaml
 containers:
   - name: tick
-    image: ghcr.io/ai-swfactory/kcat:1.7.1-YYYYMMDD
+    image: ghcr.io/ai-swfactory-oss/kcat:1.7.1-YYYYMMDD
     args: ["-b", "kafka-bootstrap:9092", "-t", "jobs.tick", "-k", "pool-sync", "-P", "/tick/message.json"]
     volumeMounts:
       - { name: tick, mountPath: /tick, readOnly: true }

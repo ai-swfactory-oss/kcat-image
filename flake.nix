@@ -68,7 +68,7 @@
               User = "65534:65534";
               Env = [ "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt" ];
               Labels = {
-                "org.opencontainers.image.source" = "https://github.com/ai-swfactory/kcat-image";
+                "org.opencontainers.image.source" = "https://github.com/ai-swfactory-oss/kcat-image";
                 "org.opencontainers.image.description" = "Minimal static kcat (Kafka CLI) image built with Nix";
                 "org.opencontainers.image.licenses" = "BSD-2-Clause";
                 "org.opencontainers.image.version" = kcat.version;

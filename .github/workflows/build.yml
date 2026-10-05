@@ -1,7 +1,7 @@
 name: build
 
 # Builds the image natively on amd64 and arm64, smoke-tests it against a real
-# Kafka-compatible broker and pushes a multi-arch image to ghcr.io/ai-swfactory/kcat.
+# Kafka-compatible broker and pushes a multi-arch image to ghcr.io/ai-swfactory-oss/kcat.
 # Pull requests (this workflow called from pr.yml) build and test only.
 
 on:

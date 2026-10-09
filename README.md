@@ -20,6 +20,7 @@ One layer, about 4.5 MB compressed:
 
 - `/bin/kcat`: statically linked against musl, stripped, no `/nix/store` references.
 - `/etc/ssl/certs/ca-bundle.crt`: CA certificates for TLS brokers.
+- `/usr/share/licenses/`: the license texts of everything above.
 
 No shell, no package manager, runs as `65534:65534` (nobody).
 
@@ -74,4 +75,19 @@ nix build .#image && docker load < result
 
 ## License
 
-The build code in this repository is MIT. kcat itself is BSD-2-Clause (https://github.com/edenhill/kcat).
+The build code in this repository is BSD-2-Clause, the same license as [kcat](https://github.com/edenhill/kcat).
+
+The image redistributes kcat and the libraries statically linked into it, each under its own license. Their license texts ship in the image under `/usr/share/licenses/<component>/`:
+
+| Component | License |
+|---|---|
+| kcat | BSD-2-Clause |
+| librdkafka | BSD-2-Clause; its bundled code adds MIT, Zlib, BSD-3-Clause, Apache-2.0, ISC and public domain (`LICENSES.txt`) |
+| OpenSSL | Apache-2.0 |
+| zstd | BSD-3-Clause (dual-licensed upstream; used under BSD) |
+| zlib | Zlib |
+| yajl | ISC |
+| musl | MIT |
+| CA bundle (Mozilla NSS `certdata.txt`) | MPL-2.0 |
+
+The `org.opencontainers.image.licenses` label carries the combined SPDX expression.
